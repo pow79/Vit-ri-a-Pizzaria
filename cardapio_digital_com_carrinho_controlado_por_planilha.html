@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cardápio Digital – Vitória’s Pizzaria</title>
+  <style>
+    :root{
+      --bg:#0b0b0b;        /* preto de fundo */
+      --text:#ffffff;      /* textos */
+      --brand:#f58220;     /* laranja destaque */
+      --gold:#ffd700;      /* dourado detalhes */
+      --muted:#9aa0a6;     /* cinza claro */
+      --card:#121212;      /* cartões */
+      --ok:#16a34a;
+      --danger:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{
+      position:sticky;top:0;z-index:20;
+      background:linear-gradient(180deg, #111 0%, rgba(17,17,17,.85) 100%);
+      backdrop-filter:saturate(140%) blur(6px);
+      border-bottom:1px solid #1f1f1f;
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand h1{font-size:1.2rem;margin:0}
+    .pill{background:rgba(245,130,32,.12);border:1px solid rgba(245,130,32,.35);color:var(--brand);padding:6px 10px;border-radius:999px;font-weight:600}
+    .promo{display:flex;gap:10px;align-items:center;margin-top:8px}
+    .promo b{color:var(--gold)}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:900px){.grid{grid-template-columns:2fr 1fr}}
+    .card{background:var(--card);border:1px solid #1f1f1f;border-radius:16px;padding:16px}
+    .search{display:flex;gap:8px}
+    input,select,button,textarea{background:#0e0e0e;border:1px solid #2a2a2a;color:var(--text);padding:10px;border-radius:10px}
+    input::placeholder{color:#6b7280}
+    button{cursor:pointer}
+    button.primary{background:var(--brand);border-color:#000;color:#111;font-weight:800}
+    button.ghost{background:transparent}
+    .cat{margin:22px 0 8px;font-size:.95rem;color:var(--gold);letter-spacing:.3px}
+    .item{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px;border-bottom:1px dashed #242424}
+    .item h4{margin:0 0 6px 0}
+    .item p{margin:0;color:var(--muted);font-size:.92rem}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .price{font-weight:700}
+    .right{text-align:right}
+    .cart-list{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto}
+    .cart-item{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px;border:1px solid #262626;border-radius:12px}
+    .cart-item small{color:var(--muted)}
+    .totals{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:12px}
+    .badge{font-size:.75rem;color:#111;background:var(--gold);padding:2px 8px;border-radius:999px;font-weight:700}
+    .footer-actions{position:sticky;bottom:0;background:linear-gradient(180deg, rgba(11,11,11,0) 0%, #0b0b0b 30%);padding-top:8px}
+    .note{color:var(--muted);font-size:.9rem}
+    .section-title{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px}
+    .section-title h3{margin:0;font-size:1rem}
+    .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .success{color:var(--ok)}
+    .danger{color:var(--danger)}
+    .divider{height:1px;background:#212121;margin:14px 0}
+  </style>
+</head>
+<body>
+  <!-- \______________________________________________
+       CARDÁPIO DIGITAL CONTROLADO POR PLANILHA EXCEL
+       Como usar com Excel:
+       1) No Excel, organize colunas: categoria,nome,descricao,preco_8,preco_4
+       2) Arquivo > Salvar como > CSV (separado por vírgulas) e coloque no mesmo
+          diretório do arquivo HTML com o nome: cardapio.csv
+       3) Na variável DATA_SOURCE, troque para 'csv' e garanta que o arquivo
+          cardapio.csv esteja junto. (Também funciona hospedado, usando caminho/URL.)
+       Dica: Evite vírgulas nas descrições do CSV. Se precisar, envolva o texto entre aspas.
+      ______________________________________________/ -->
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <span class="pill">Vitória’s Pizzaria</span>
+        <h1>Forno a Lenha – Delivery</h1>
+      </div>
+      <div class="promo">
+        <span>🎁</span>
+        <b>Compre uma pizza e ganhe 1 refrigerante grátis!</b>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap grid" id="app">
+    <section class="card">
+      <div class="section-title">
+        <h3>Cardápio</h3>
+        <div class="inline">
+          <input id="q" type="search" placeholder="Buscar por sabor ou ingrediente…" />
+          <select id="filtraCat">
+            <option value="">Todas as categorias</option>
+          </select>
+        </div>
+      </div>
+      <div id="menu"></div>
+      <div class="divider"></div>
+      <p class="note">📌 Observação: preços por tamanho. Se a pizza tiver apenas um tamanho, selecione "8 fatias".</p>
+    </section>
+
+    <aside class="card">
+      <div class="section-title">
+        <h3>Carrinho</h3>
+        <button class="ghost" id="limpar">Limpar</button>
+      </div>
+      <div class="cart-list" id="cart"></div>
+      <div class="divider"></div>
+
+      <h3>Dados do cliente</h3>
+      <div class="inline" style="flex-direction:column;align-items:stretch">
+        <input id="cli_nome" placeholder="Nome completo" />
+        <input id="cli_whats" placeholder="WhatsApp (com DDD)" />
+        <textarea id="cli_end" rows="3" placeholder="Endereço (rua, número, bairro, ponto de referência)"></textarea>
+        <select id="pagto">
+          <option value="Dinheiro">Dinheiro</option>
+          <option value="Pix">Pix</option>
+          <option value="Cartão (crédito)">Cartão (crédito)</option>
+          <option value="Cartão (débito)">Cartão (débito)</option>
+        </select>
+      </div>
+      <div class="totals">
+        <div>Subtotal</div> <div id="subtotal" class="right">R$ 0,00</div>
+        <div>Desconto promoção</div> <div id="promo" class="right">- 1 refri 🎁</div>
+        <div style="font-weight:800">Total</div> <div id="total" class="right" style="font-weight:800">R$ 0,00</div>
+      </div>
+
+      <div class="footer-actions">
+        <button class="primary" id="enviar" style="width:100%;margin-top:10px">Enviar pedido via WhatsApp</button>
+        <p class="note">O pedido será enviado para o WhatsApp da pizzaria com todos os detalhes.</p>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // ========================= CONFIGURAÇÃO =========================
+    const WHATSAPP_NUMBER = '5512988874265'; // mude para o número oficial (DDI+DDD+numero)
+    const DATA_SOURCE = 'embedded';          // 'embedded' | 'csv'
+    const CSV_PATH = 'cardapio.csv';         // usado se DATA_SOURCE = 'csv'
+
+    // ====================== DADOS EMBUTIDOS (pode editar) ======================
+    // Caso prefira controlar por Excel, salve como CSV e troque DATA_SOURCE para 'csv'.
+    const EMBEDDED_DATA = [
+      // categoria, nome, descricao, preco_8, preco_4
+      ['Pizza Doce','Chocolate','Chocolate e granulado',44,32],
+      ['Pizza Doce','Prestígio','Chocolate e coco ralado',44,32],
+      ['Pizza Doce','Banana','Banana, leite condensado e canela',37,27.10],
+      ['Pizza Doce','Banana II','Banana e chocolate',41,31],
+      ['Pizza Doce','Romeu e Julieta','Mussarela e goiabada',45,32.90],
+      ['Pizza Doce','Beijinho','Mussarela, leite condensado, coco ralado e granulado',45,33.40],
+      ['Fogassa Assada','Frango Catupiry','',27,null],
+      ['Fogassa Assada','Calabresa c/ Mussarela','',27.50,null],
+      ['Fogassa Assada','Presunto c/ Mussarela','',28,null],
+      ['Fogassa Assada','Pepperoni c/ Mussarela','',35,null],
+      ['Fogassa Assada','Dois Queijos','Mussarela e Catupiry',32,null],
+      ['Beirute','Frango e Catupiry','Acompanha tomate, alface e maionese',35,null],
+      ['Beirute','Calabresa c/ Mussarela','Acompanha tomate, alface e maionese',35,null],
+      ['Beirute','Presunto e Queijo','Acompanha tomate, alface e maionese',35,null],
+      // 01 a 14
+      ['Pizzas Salgadas','Mussarela','Mussarela',52,36],
+      ['Pizzas Salgadas','Dois Queijos','Mussarela e catupiry',51,37.20],
+      ['Pizzas Salgadas','Três Queijos','Mussarela, catupiry e parmesão',61,45.40],
+      ['Pizzas Salgadas','Quatro Queijos','Mussarela, parmesão, gorgonzola e catupiry',70,50.50],
+      ['Pizzas Salgadas','Cinco Queijos','Mussarela, parmesão, gorgonzola, catupiry e provolone',72,55.90],
+      ['Pizzas Salgadas','Marguerita','Mussarela, parmesão, tomate e manjericão',57,40.40],
+      ['Pizzas Salgadas','Napolitana','Mussarela, parmesão, tomate e alho',53,37.70],
+      ['Pizzas Salgadas','Da Casa','Mussarela, presunto, palmito e catupiry',67,45.80],
+      ['Pizzas Salgadas','Rúcula','Mussarela, rúcula e tomate seco',64,46],
+      ['Pizzas Salgadas','Vegetais','Mussarela, brócolis, escarola e tomate seco',64,46],
+      ['Pizzas Salgadas','Vegetais II','Mussarela, brócolis, escarola, palmito, champignon e tomate seco',83,59.30],
+      ['Pizzas Salgadas','Milho','Mussarela, milho e catupiry',54,36.20],
+      ['Pizzas Salgadas','Levíssima','Mussarela, tomate e orégano',42,30],
+      ['Pizzas Salgadas','Calabresa','Mussarela e calabresa',48,32],
+      // 15 a 28
+      ['Pizzas Salgadas','Calabresa II','Mussarela e calabresa',49,35.50],
+      ['Pizzas Salgadas','Calabresa III','Mussarela, calabresa e cebola',53,37],
+      ['Pizzas Salgadas','Calabresa IV','Mussarela, calabresa e catupiry',49,35.50],
+      ['Pizzas Salgadas','Baiana','Calabresa moída, ovo, cebola e pimenta',53,39],
+      ['Pizzas Salgadas','Toscana','Mussarela, calabresa e linguiça toscana',57,41],
+      ['Pizzas Salgadas','Lombo','Mussarela e lombo',50,37],
+      ['Pizzas Salgadas','Lombo II','Lombo e catupiry',51,38.20],
+      ['Pizzas Salgadas','Lombo III','Lombo, cebola e parmesão',73,52.30],
+      ['Pizzas Salgadas','Presunto','Mussarela e presunto',44,31],
+      ['Pizzas Salgadas','Portuguesa','Mussarela, presunto, ovo, cebola, pimentão e azeitonas',66,45.60],
+      ['Pizzas Salgadas','Portuguesa II','Mussarela, presunto, ovo, cebola, palmito e catupiry',66,45.60],
+      ['Pizzas Salgadas','Grega','Mussarela, presunto, cebola, ovo, azeitona e tomate',58,41.50],
+      ['Pizzas Salgadas','Bacon','Mussarela e bacon',53,42.60],
+      ['Pizzas Salgadas','Bacon II','Mussarela, bacon e catupiry',62,44.70],
+      // 29 a 42
+      ['Pizzas Salgadas','Pepperoni','Mussarela, pepperoni e parmesão',67,48.10],
+      ['Pizzas Salgadas','Pepperoni II','Pepperoni, mussarela e catupiry',66,48.10],
+      ['Pizzas Salgadas','Pepperoni III','Pepperoni, mussarela e cheddar',59,42.50],
+      ['Pizzas Salgadas','Escarola','Escarola, mussarela, parmesão, presunto e azeitonas',55,39.50],
+      ['Pizzas Salgadas','Brócolis','Brócolis e mussarela',54,39],
+      ['Pizzas Salgadas','Brócolis II','Mussarela, brócolis e carne seca',66,46.80],
+      ['Pizzas Salgadas','Palmito','Mussarela e palmito',53,38],
+      ['Pizzas Salgadas','Palmanela','Mussarela, presunto, palmito e bacon',64,45.70],
+      ['Pizzas Salgadas','Bauru Especial','Mussarela, presunto, tomate e parmesão',57,37],
+      ['Pizzas Salgadas','Nordestina','Mussarela, calabresa e carne seca temperada',55,38],
+      ['Pizzas Salgadas','Frango c/ Catupiry','Frango e catupiry',50,36.50],
+      ['Pizzas Salgadas','Frango Crocante','Frango, batata palha e catupiry',56,40.70],
+      ['Pizzas Salgadas','Frango c/ Mussarela','Frango e mussarela',49,35],
+      ['Pizzas Salgadas','Frango Cream Cheese','Frango, cream cheese e mussarela',59,42.50],
+      // 43 a 53
+      ['Pizzas Salgadas','Caipira','Frango, catupiry, bacon e milho',58,41.10],
+      ['Pizzas Salgadas','Peito de Peru','Peito de peru, catupiry, mussarela e milho',59,42.50],
+      ['Pizzas Salgadas','Peito de Peru II','Peito de peru, mussarela, catupiry e bacon',62,45],
+      ['Pizzas Salgadas','Peito de Peru III','Peito de peru, mussarela, catupiry e palmito',62,45.60],
+      ['Pizzas Salgadas','Aliche','Mussarela e filé de aliche',60,43.50],
+      ['Pizzas Salgadas','Aliche II','Mussarela, aliche e escarola',68,48],
+      ['Pizzas Salgadas','Aliche III','Mussarela, aliche, tomate e parmesão',72,50.60],
+      ['Pizzas Salgadas','Atum','Atum e cebola',49,35],
+      ['Pizzas Salgadas','Atum II','Atum e mussarela',59,42],
+      ['Pizzas Salgadas','Atum III','Atum, catupiry e mussarela',60,43.50],
+      ['Pizzas Salgadas','Peruana','Atum, tomate e parmesão',64,46]
+    ];
+
+    // ========================= STATE / LÓGICA =========================
+    const state = {
+      items: [], // {categoria,nome,descricao,preco_8,preco_4}
+      cart: []   // {nome,tamanho,preco,qtde,obs}
+    };
+
+    const fmt = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+
+    function renderMenu(){
+      const menu = document.getElementById('menu');
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const catSel = document.getElementById('filtraCat').value;
+      menu.innerHTML = '';
+
+      const grouped = groupBy(state.items, x=>x.categoria);
+      Object.keys(grouped).sort().forEach(cat=>{
+        if(catSel && catSel!==cat) return;
+        const items = grouped[cat]
+          .filter(it=> !q || it.nome.toLowerCase().includes(q) || (it.descricao||'').toLowerCase().includes(q));
+        if(!items.length) return;
+        const h = document.createElement('div');
+        h.className = 'cat';
+        h.textContent = cat;
+        menu.appendChild(h);
+
+        items.forEach(it=> menu.appendChild(renderItem(it)));
+      });
+    }
+
+    function renderItem(it){
+      const el = document.createElement('div');
+      el.className = 'item';
+      const left = document.createElement('div');
+      left.innerHTML = `<h4>${it.nome} ${badgePromo(it)}</h4><p>${it.descricao||''}</p>`;
+
+      const right = document.createElement('div');
+      right.className = 'right';
+      const controls = document.createElement('div');
+      controls.className = 'controls';
+
+      const selTam = document.createElement('select');
+      const has4 = isFiniteNumber(it.preco_4);
+      selTam.innerHTML = `
+        <option value="8">8 fatias (${fmt.format(it.preco_8)})</option>
+        ${has4?`<option value="4">4 fatias (${fmt.format(it.preco_4)})</option>`:''}
+      `;
+
+      const qty = document.createElement('input');
+      qty.type='number'; qty.min='1'; qty.value='1'; qty.style.width='80px';
+
+      const btn = document.createElement('button');
+      btn.className='primary'; btn.textContent='Adicionar';
+      btn.onclick = ()=>{
+        const tamanho = selTam.value;
+        const preco = tamanho==='8'? it.preco_8 : (it.preco_4 ?? it.preco_8);
+        addToCart({nome: it.nome, tamanho, preco, qtde: parseInt(qty.value)||1, obs:''});
+      };
+
+      controls.append(selTam, qty, btn);
+      right.append(controls);
+      el.append(left,right);
+      return el;
+    }
+
+    function badgePromo(it){
+      // Exemplo simples: destaque em pizzas doces
+      if(it.categoria.includes('Doce')) return `<span class="badge">🎁 refri grátis</span>`;
+      return '';
+    }
+
+    function addToCart(item){
+      const key = (x)=>`${x.nome}|${x.tamanho}`;
+      const idx = state.cart.findIndex(x=>key(x)===key(item));
+      if(idx>=0){ state.cart[idx].qtde += item.qtde; }
+      else{ state.cart.push(item); }
+      renderCart();
+    }
+
+    function renderCart(){
+      const box = document.getElementById('cart');
+      box.innerHTML = '';
+      let subtotal = 0;
+      state.cart.forEach((c,i)=>{
+        const total = c.preco * c.qtde;
+        subtotal += total;
+        const row = document.createElement('div');
+        row.className = 'cart-item';
+        row.innerHTML = `
+          <div>
+            <div style="font-weight:700">${c.nome} – ${c.tamanho} fatias</div>
+            <small>${fmt.format(c.preco)} x ${c.qtde}</small>
+          </div>
+          <div class="right">
+            <div class="price">${fmt.format(total)}</div>
+            <div class="inline" style="justify-content:flex-end;margin-top:6px">
+              <button class="ghost" title="-1" onclick="qty(${i},-1)">−</button>
+              <button class="ghost" title="+1" onclick="qty(${i},+1)">+</button>
+              <button class="ghost danger" title="Remover" onclick="rem(${i})">Remover</button>
+            </div>
+          </div>`;
+        box.appendChild(row);
+      });
+      document.getElementById('subtotal').textContent = fmt.format(subtotal);
+      document.getElementById('total').textContent = fmt.format(subtotal); // promo refri é brinde, não altera valor
+    }
+
+    function qty(i,delta){
+      state.cart[i].qtde += delta;
+      if(state.cart[i].qtde<=0) state.cart.splice(i,1);
+      renderCart();
+    }
+    function rem(i){ state.cart.splice(i,1); renderCart(); }
+
+    function groupBy(arr, getKey){
+      return arr.reduce((acc,cur)=>{ const k=getKey(cur); (acc[k]=acc[k]||[]).push(cur); return acc; },{});
+    }
+    function isFiniteNumber(n){ return typeof n==='number' && isFinite(n); }
+
+    // ========================= BUSCA / FILTRO =========================
+    document.getElementById('q').addEventListener('input', renderMenu);
+    document.getElementById('limpar').addEventListener('click', ()=>{ state.cart=[]; renderCart(); });
+
+    // ========================= ENVIAR PEDIDO =========================
+    document.getElementById('enviar').addEventListener('click', ()=>{
+      if(state.cart.length===0){ alert('Adicione itens ao carrinho.'); return; }
+      const nome = document.getElementById('cli_nome').value.trim();
+      const whats = document.getElementById('cli_whats').value.trim();
+      const end = document.getElementById('cli_end').value.trim();
+      const pagto = document.getElementById('pagto').value;
+      if(!nome || !whats || !end){ alert('Preencha nome, WhatsApp e endereço.'); return; }
+
+      const linhas = [];
+      linhas.push('*Pedido – Vitória’s Pizzaria*');
+      linhas.push('');
+      state.cart.forEach(c=>{
+        linhas.push(`• ${c.nome} (${c.tamanho} fatias) – ${fmt.format(c.preco)} x ${c.qtde}`);
+      });
+      const totalText = document.getElementById('total').textContent;
+      linhas.push('');
+      linhas.push(`Total: *${totalText}*`);
+      linhas.push('Promoção: Compre uma pizza e ganhe 1 refrigerante grátis! 🎁');
+      linhas.push('');
+      linhas.push('*Dados do cliente*');
+      linhas.push(`Nome: ${nome}`);
+      linhas.push(`WhatsApp: ${whats}`);
+      linhas.push(`Endereço: ${end}`);
+      linhas.push(`Pagamento: ${pagto}`);
+
+      const msg = encodeURIComponent(linhas.join('\n'));
+      const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`;
+      window.open(url, '_blank');
+    });
+
+    // ========================= CARREGAR DADOS =========================
+    async function load(){
+      let rows = [];
+      if(DATA_SOURCE==='csv'){
+        rows = await loadFromCSV(CSV_PATH);
+      }else{
+        rows = EMBEDDED_DATA;
+      }
+      state.items = rows.map(([categoria,nome,descricao,preco_8,preco_4])=>({
+        categoria, nome, descricao, preco_8:Number(preco_8), preco_4: preco_4!==null?Number(preco_4):null
+      }));
+
+      // popular filtro de categoria
+      const sel = document.getElementById('filtraCat');
+      const cats = [...new Set(state.items.map(x=>x.categoria))].sort();
+      cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+      sel.addEventListener('change', renderMenu);
+
+      renderMenu();
+      renderCart();
+    }
+
+    async function loadFromCSV(path){
+      try{
+        const resp = await fetch(path);
+        const text = await resp.text();
+        return parseCSV(text);
+      }catch(e){
+        alert('Não foi possível carregar o arquivo CSV. Usando dados embutidos.');
+        return EMBEDDED_DATA;
+      }
+    }
+
+    // CSV simples: suporta campos entre aspas com vírgulas internas
+    function parseCSV(csv){
+      const rows=[]; let i=0, field='', row=[], inQuotes=false;
+      const pushField=()=>{ row.push(inQuotes?field:field.trim()); field=''; inQuotes=false; };
+      const pushRow=()=>{ if(row.length){ rows.push(row); row=[]; } };
+      while(i<csv.length){
+        const ch = csv[i];
+        if(inQuotes){
+          if(ch==='"' && csv[i+1]==='"'){ field+='"'; i++; }
+          else if(ch==='"'){ inQuotes=false; }
+          else{ field+=ch; }
+        }else{
+          if(ch==='"'){ inQuotes=true; }
+          else if(ch===','){ pushField(); }
+          else if(ch==='\n' || ch==='\r'){ if(field!==''||row.length){ pushField(); pushRow(); } }
+          else{ field+=ch; }
+        }
+        i++;
+      }
+      if(field!==''||row.length){ pushField(); pushRow(); }
+      // descartar cabeçalho se existir
+      if(rows.length && (rows[0][0]||'').toLowerCase().includes('categoria')) rows.shift();
+      return rows;
+    }
+
+    load();
+  </script>
+</body>
+</html>
